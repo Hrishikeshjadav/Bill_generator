@@ -1,0 +1,148 @@
+import csv
+import datetime
+import os
+
+
+def ask_table_format():
+    """Ask the user whether to display the bill in table format. Returns True/False."""
+    while True:
+        ans = input("Display bill in table format? (y/n): ").strip().lower()
+        if ans in ("y", "yes"):
+            return True
+        if ans in ("n", "no"):
+            return False
+        print("Please answer 'y' or 'n'.")
+
+
+def ask_csv_conversion():
+    """Ask the user whether to automatically save tables as CSV. Returns True/False."""
+    while True:
+        ans = input("Automatically save tables as CSV? (y/n): ").strip().lower()
+        if ans in ("y", "yes"):
+            return True
+        if ans in ("n", "no"):
+            return False
+        print("Please answer 'y' or 'n'.")
+
+
+class Item:
+    def __init__(self, sr_no, name, qty, price):
+        self.sr_no = sr_no
+        self.name = name
+        self.qty = qty
+        self.price = price
+        self.total = round(self.qty * self.price, 2)
+
+
+class Bill_Generator:
+    def __init__(self, gst_rate=0.18):
+        self.items = []
+        self.gst_rate = gst_rate
+
+    def add_item(self, item: Item):
+        self.items.append(item)
+
+    def calculate_total(self):
+        sub_total = round(sum(i.total for i in self.items), 2)
+        gst = round(sub_total * self.gst_rate, 2)
+        grand_total = round(sub_total + gst, 2)
+        return sub_total, gst, grand_total
+
+    def show_bill(self):
+        print("\n====================")
+        print("         BILL")
+        print("===================")
+        for i in self.items:
+            print(f"Sr.no:{i.sr_no}  Name:{i.name}  Qty:{i.qty}  Price:{i.price:.2f}  Total:{i.total:.2f}")
+        print("------------------")
+        subtotal, gst, grand_total = self.calculate_total()
+        print(f"Subtotal: {subtotal:.2f}")
+        print(f"GST({int(self.gst_rate*100)}%): {gst:.2f}")
+        print(f"Grand Total: {grand_total:.2f}")
+        print("=============================" )
+
+    def show_bill_table(self, save_csv=False, csv_folder=None):
+        # Prepare table rows
+        headers = ["Sr.no", "Name", "Qty", "Price", "Total"]
+        rows = []
+        for i in self.items:
+            rows.append([str(i.sr_no), i.name, f"{i.qty}", f"{i.price:.2f}", f"{i.total:.2f}"])
+
+        # compute column widths
+        cols = list(zip(*([headers] + rows))) if rows else [headers]
+        widths = [max(len(cell) for cell in col) for col in cols]
+
+        sep = "+" + "+".join(["-" * (w + 2) for w in widths]) + "+"
+
+        # print header
+        print("\n" + sep)
+        header_line = "| " + " | ".join(h.ljust(w) for h, w in zip(headers, widths)) + " |"
+        print(header_line)
+        print(sep)
+
+        # print rows
+        for r in rows:
+            line = "| " + " | ".join(str(cell).ljust(w) for cell, w in zip(r, widths)) + " |"
+            print(line)
+        print(sep)
+
+        subtotal, gst, grand_total = self.calculate_total()
+        print(f"Subtotal: {subtotal:.2f}")
+        print(f"GST({int(self.gst_rate*100)}%): {gst:.2f}")
+        print(f"Grand Total: {grand_total:.2f}")
+        print("=============================\n")
+
+        if save_csv:
+            # ensure folder
+            folder = csv_folder or os.getcwd()
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = os.path.join(folder, f"bill_{timestamp}.csv")
+            self.save_csv(filename)
+            print(f"Saved CSV to: {filename}")
+
+    def save_csv(self, filename):
+        headers = ["sr_no", "name", "qty", "price", "total"]
+        with open(filename, "w", newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+            for i in self.items:
+                writer.writerow([i.sr_no, i.name, i.qty, f"{i.price:.2f}", f"{i.total:.2f}"])
+            # write totals at bottom
+            subtotal, gst, grand_total = self.calculate_total()
+            writer.writerow([])
+            writer.writerow(['', '', '', 'Subtotal', f"{subtotal:.2f}"])
+            writer.writerow(['', '', '', 'GST', f"{gst:.2f}"])
+            writer.writerow(['', '', '', 'Grand Total', f"{grand_total:.2f}"])
+
+
+if __name__ == "__main__":
+    # ask preferences
+    table_mode = ask_table_format()
+    csv_auto = False
+    if table_mode:
+        csv_auto = ask_csv_conversion()
+
+    bill = Bill_Generator()
+    sr = 1
+    while True:
+        print("\n Enter item details (or type 'quit' to finish): ")
+        name = input("Item name: ")
+        if name.strip().lower() == "quit":
+            break
+        try:
+            qty = float(input("Quantity: "))
+            price = float(input("Price: "))
+        except ValueError:
+            print("Invalid number entered. Please try again.")
+            continue
+        item = Item(sr, name, qty, price)
+        bill.add_item(item)
+        sr += 1
+
+    print("\n Final bill generated:")
+    if table_mode:
+        bill.show_bill_table(save_csv=csv_auto)
+    else:
+        bill.show_bill()
+
+
